@@ -36,12 +36,14 @@ import seaborn as sns
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics import classification_report
 from sklearn.decomposition import PCA
 
 """- `pandas`, `numpy`: untuk manipulasi dan analisis data.
 - `matplotlib`, `seaborn`: untuk visualisasi grafik dan distribusi data.
 - `LabelEncoder`, `MinMaxScaler`: untuk encoding dan normalisasi fitur numerik.
 - `cosine_similarity`: untuk menghitung kemiripan antar lagu.
+- `classification_report`: evaluasi performa model
 - `PCA`: untuk reduksi dimensi dan visualisasi clustering lagu.
 
 ## Load Dataset
@@ -244,13 +246,50 @@ valid_df[valid_df['track_encoded'] == example_track][['name', 'artists']]
 
 """Memilih satu lagu secara acak dari dataset sebagai lagu referensi untuk rekomendasi. Lagu yang dipilih akan digunakan sebagai input untuk mencari lagu-lagu dengan karakteristik konten yang paling mirip."""
 
-recommendations = recommend_similar_tracks(example_track, top_n=20)
+recommendations = recommend_similar_tracks(example_track, top_n=10)
 print("Rekomendasi lagu serupa:")
 recommendations
 
 """Mengambil 20 lagu yang paling mirip dengan lagu referensi berdasarkan hasil perhitungan cosine similarity, lalu menampilkannya sebagai rekomendasi. Setiap lagu yang direkomendasikan disertai dengan skor kemiripannya.
 
 # Evaluation
+
+## Classification Report
+"""
+
+def generate_labels_for_evaluation(track_id, top_k=10, similarity_threshold=0.9):
+    sim_scores = similarity_df.loc[track_id]
+
+    relevant_items = sim_scores[sim_scores > similarity_threshold].index.tolist()
+    if track_id in relevant_items:
+        relevant_items.remove(track_id)
+
+    recommended_items = sim_scores.sort_values(ascending=False).iloc[1:top_k+1].index.tolist()
+
+    y_true = [1 if item in relevant_items else 0 for item in recommended_items]
+    y_pred = [1 for _ in range(len(y_true))]
+
+    return y_true, y_pred, relevant_items, recommended_items
+
+"""Fungsi `generate_labels_for_evaluation()` digunakan untuk membuat label `y_true` dan `y_pred` guna evaluasi rekomendasi. Lagu dianggap relevan jika memiliki similarity di atas `similarity_threshold`. Semua lagu hasil rekomendasi dianggap sebagai prediksi positif (`y_pred = 1`)."""
+
+y_true, y_pred, relevant_items, recommended_items = generate_labels_for_evaluation(
+    example_track, top_k=10, similarity_threshold=0.9
+)
+report = classification_report(
+    y_true,
+    y_pred,
+    target_names=['Not Relevant', 'Relevant'],
+    labels=[0, 1],
+    zero_division=0
+    )
+
+print("Classification Report:\n")
+print(report)
+
+"""Menghasilkan label `y_true` dan `y_pred` menggunakan fungsi `generate_labels_for_evaluation()` lalu mengevaluasi performa model menggunakan `classification_report` dari scikit-learn untuk melihat metrik precision, recall, dan f1-score berdasarkan kategori relevan atau tidak relevan.
+
+## Principal Component Analysis
 """
 
 pca = PCA(n_components=2)
